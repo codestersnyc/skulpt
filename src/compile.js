@@ -2286,11 +2286,15 @@ Compiler.prototype.cclass = function (s) {
     var scopename;
     var bases;
     var decos;
+    var docstring;
+
     Sk.asserts.assert(s instanceof Sk.astnodes.ClassDef);
 
     decos = this.vseqexpr(s.decorator_list);
 
     bases = this.vseqexpr(s.bases);
+
+    docstring = Sk.getDocString(s.body);
 
     scopename = this.enterScope(s.name, s, s.lineno);
     entryBlock = this.newBlock("class entry");
@@ -2322,7 +2326,7 @@ Compiler.prototype.cclass = function (s) {
     this.exitScope();
 
     // todo; metaclass
-    out("$ret = Sk.misceval.buildClass($gbl,", scopename, ",", s.name["$r"]().v, ",[", bases, "], $cell);")
+    out("$ret = Sk.misceval.buildClass($gbl,", scopename, ",", s.name["$r"]().v, ",[", bases, "], $cell,", docstring ? this.vexpr(docstring) : "Sk.builtin.none.none$", ");");
 
     // apply decorators
 

@@ -1291,7 +1291,7 @@ Sk.exportSymbol("Sk.misceval.promiseToSuspension", Sk.misceval.promiseToSuspensi
  * should return a newly constructed class object.
  *
  */
-Sk.misceval.buildClass = function (globals, func, name, bases, cell) {
+Sk.misceval.buildClass = function (globals, func, name, bases, cell, docstring) {
     // todo; metaclass
     var klass;
     var meta = Sk.builtin.type;
@@ -1307,6 +1307,8 @@ Sk.misceval.buildClass = function (globals, func, name, bases, cell) {
 
     // file's __name__ is class's __module__
     locals.__module__ = globals["__name__"];
+    // docstring should be attached if it exists
+    locals.__doc__ = docstring ? docstring : Sk.builtin.none.none$;
     var _name = new Sk.builtin.str(name);
     var _bases = new Sk.builtin.tuple(bases);
     var _locals = [];
