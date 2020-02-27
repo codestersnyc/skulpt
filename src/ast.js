@@ -3363,5 +3363,26 @@ Sk.astDump = function (node) {
     return _format(node, "");
 };
 
+Sk.getDocString = function (body) {
+    // Adapted from https://github.com/python/cpython/blob/master/Python/ast.c#L5945
+    if (!body.length) {
+        return NULL;
+    }
+
+    var st = body[0];
+    if (st._astname != "Expr") {
+        return NULL;
+    }
+
+    var e = st.value;
+    if (e._astname == "Str") {  // TODO: In Python 3, this should check for any constant expression, not just Str
+        return e;
+    }
+
+    return NULL;
+};
+
 Sk.exportSymbol("Sk.astFromParse", Sk.astFromParse);
 Sk.exportSymbol("Sk.astDump", Sk.astDump);
+Sk.exportSymbol("Sk.getDocString", Sk.getDocString);
+

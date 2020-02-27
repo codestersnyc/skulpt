@@ -1840,6 +1840,7 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
     var hasFree;
     var isGenerator;
     var scopename;
+    var docstring;
     var decos = [];
     var defaults = [];
     var kw_defaults = [];
@@ -1868,6 +1869,8 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
     if (!Sk.__future__.python3 && args && args.kwonlyargs && args.kwonlyargs.length != 0) {
         throw new Sk.builtin.SyntaxError("Keyword-only arguments are not supported in Python 2");
     }
+
+    docstring = Sk.getDocString(n.body);
 
     //
     // enter the new scope, and create the first block
@@ -2092,6 +2095,11 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
     if (vararg) {
         out(scopename, ".co_varargs=1;");
     }
+
+    //
+    // Attach evaluated docstring
+    //
+    out(scopename, ".co_docstring=", docstring ? this.vexpr(docstring) : "Sk.builtin.none.none$", ";");
 
     //
     // build either a 'function' or 'generator'. the function is just a simple

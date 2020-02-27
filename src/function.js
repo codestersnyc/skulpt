@@ -252,6 +252,7 @@ Sk.builtin.func = function (code, globals, closure, closure2) {
 
     this["$d"] = {
         "__name__": code["co_name"],
+        "__doc__": code["co_docstring"],
         "__class__": Sk.builtin.func
     };
     this.func_closure = closure;
