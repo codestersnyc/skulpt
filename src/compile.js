@@ -23,6 +23,7 @@ function Compiler (filename, st, flags, canSuspend, sourceCodeForAnnotation) {
     this.stack = [];
 
     this.result = [];
+    this.docstring = null;
 
     // this.gensymcount = 0;
 
@@ -307,6 +308,64 @@ Compiler.prototype._gr = function (hint, rest) {
     }
     out(";");
     return v;
+};
+
+/**
+ * Adds a docstring constant
+ */
+Compiler.prototype.addDocString = function (body) {
+    var e = Sk.getDocString(body);
+
+    if (!e) {
+        return "Sk.builtin.none.none$";
+    }
+
+    // Adapted from vexpr, but only dealing with Str, Num, and NameConstant types
+    switch (e.constructor) {
+        case Sk.astnodes.Str:
+            return this.makeConstant("new Sk.builtin.str(", e.s["$r"]().v, ")");
+        case Sk.astnodes.Num:
+            if (typeof e.n === "number") {
+                return e.n;
+            }
+            else if (e.n instanceof Sk.builtin.int_) {
+                return this.makeConstant("new Sk.builtin.int_(" + e.n.v + ")");
+            } else if (e.n instanceof Sk.builtin.float_) {
+                // Preserve sign of zero for floats
+                var nStr = e.n.v === 0 && 1/e.n.v === -Infinity ? "-0" : e.n.v;
+                return this.makeConstant("new Sk.builtin.float_(" + nStr + ")");
+            }
+            else if (e.n instanceof Sk.builtin.lng) {
+                // long uses the tp$str() method which delegates to nmber.str$ which preserves the sign
+                return this.makeConstant("Sk.longFromStr('" + e.n.tp$str().v + "')");
+            }
+            else if (e.n instanceof Sk.builtin.complex) {
+                // preserve sign of zero here too
+                var real_val = e.n.real.v === 0 && 1/e.n.real.v === -Infinity ? "-0" : e.n.real.v;
+                var imag_val = e.n.imag.v === 0 && 1/e.n.imag.v === -Infinity ? "-0" : e.n.imag.v;
+                return this.makeConstant("new Sk.builtin.complex(new Sk.builtin.float_(" + real_val + "), new Sk.builtin.float_(" + imag_val + "))");
+            }
+            Sk.asserts.fail("unhandled Num type");
+            break;
+        case Sk.astnodes.NameConstant:
+            if (e.ctx === Sk.astnodes.Store || e.ctx === Sk.astnodes.AugStore || e.ctx === Sk.astnodes.Del) {
+                throw new Sk.builtin.SyntaxError("can not assign to a constant name");
+            }
+
+            switch (e.value) {
+                case Sk.builtin.none.none$:
+                    return "Sk.builtin.none.none$";
+                case Sk.builtin.bool.true$:
+                    return "Sk.builtin.bool.true$";
+                case Sk.builtin.bool.false$:
+                    return "Sk.builtin.bool.false$";
+                default:
+                    Sk.asserts.fail("invalid named constant")
+            }
+            break;
+        default:
+            Sk.asserts.fail("unhandled case " + e.constructor.name + " addDocString");
+    }
 };
 
 /**
@@ -1870,8 +1929,6 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
         throw new Sk.builtin.SyntaxError("Keyword-only arguments are not supported in Python 2");
     }
 
-    docstring = Sk.getDocString(n.body);
-
     //
     // enter the new scope, and create the first block
     //
@@ -1882,6 +1939,9 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
     hasCell = this.u.ste.childHasFree;
 
     entryBlock = this.newBlock("codeobj entry");
+
+    // Add docstring constant
+    docstring = this.addDocString(n.body);
 
     //
     // the header of the function, and arguments
@@ -2097,9 +2157,9 @@ Compiler.prototype.buildcodeobj = function (n, coname, decorator_list, args, cal
     }
 
     //
-    // Attach evaluated docstring
+    // Attach docstring constant
     //
-    out(scopename, ".co_docstring=", docstring ? this.vexpr(docstring) : "Sk.builtin.none.none$", ";");
+    out(scopename, ".co_docstring=", docstring, ";");
 
     //
     // build either a 'function' or 'generator'. the function is just a simple
@@ -2294,10 +2354,9 @@ Compiler.prototype.cclass = function (s) {
 
     bases = this.vseqexpr(s.bases);
 
-    docstring = Sk.getDocString(s.body);
-
     scopename = this.enterScope(s.name, s, s.lineno);
     entryBlock = this.newBlock("class entry");
+    docstring = this.addDocString(s.body);
 
     this.u.prefixCode = "var " + scopename + "=(function $" + s.name.v + "$class_outer($globals,$locals,$cell){var $gbl=$globals,$loc=$locals;$free=$globals;";
     this.u.switchCode += "(function $" + s.name.v + "$_closure($cell){";
@@ -2326,7 +2385,7 @@ Compiler.prototype.cclass = function (s) {
     this.exitScope();
 
     // todo; metaclass
-    out("$ret = Sk.misceval.buildClass($gbl,", scopename, ",", s.name["$r"]().v, ",[", bases, "], $cell,", docstring ? this.vexpr(docstring) : "Sk.builtin.none.none$", ");");
+    out("$ret = Sk.misceval.buildClass($gbl,", scopename, ",", s.name["$r"]().v, ",[", bases, "], $cell,", docstring, ");");
 
     // apply decorators
 
@@ -2736,6 +2795,7 @@ Compiler.prototype.cmod = function (mod) {
     var modf = this.enterScope(new Sk.builtin.str("<module>"), mod, 0, this.canSuspend);
 
     var entryBlock = this.newBlock("module entry");
+    var docstring = this.addDocString(mod.body);
     this.u.prefixCode = "var " + modf + "=(function($forcegbl){";
     this.u.varDeclsCode =
         "var $gbl = $forcegbl || {}, $blk=" + entryBlock +
@@ -2797,6 +2857,7 @@ Compiler.prototype.cmod = function (mod) {
     this.exitScope();
 
     this.result.push(this.outputAllUnits());
+    this.docstring = docstring;
     return modf;
 };
 
@@ -2832,7 +2893,8 @@ Sk.compile = function (source, filename, mode, canSuspend) {
     var ret = "$compiledmod = function() {" + c.result.join("") + "\nreturn " + funcname + ";}();";
     return {
         funcname: "$compiledmod",
-        code    : ret
+        docstring: c.docstring,
+        code: ret
     };
 };
 

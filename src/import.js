@@ -337,7 +337,7 @@ Sk.importModuleInternal_ = function (name, dumpJS, modname, suppliedPyBody, rela
 
         module["$d"] = {
             "__name__": new Sk.builtin.str(modname),
-            "__doc__": Sk.builtin.none.none$,
+            "__doc__": co.docstring ? modscope[co.docstring.split(".")[1]] : Sk.builtin.none.none$,
             "__package__": co.packagePath ? new Sk.builtin.str(modname) :
             parentModName ? new Sk.builtin.str(absolutePackagePrefix + parentModName) :
             relativePackageName ? relativePackageName : Sk.builtin.none.none$

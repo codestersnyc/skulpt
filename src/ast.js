@@ -3375,7 +3375,7 @@ Sk.getDocString = function (body) {
     }
 
     var e = st.value;
-    if (e._astname == "Str") {  // TODO: In Python 3, this should check for any constant expression, not just Str
+    if (e._astname == "Str" || e._astname == 'Num' || e._astname == 'NameConstant') {
         return e;
     }
 
